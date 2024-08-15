@@ -164,3 +164,4 @@ cython_debug/
 /src/*.csv
 /src/*.xlsx
 /src/ssl-check.py
+/src/bak
