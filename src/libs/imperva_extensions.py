@@ -27,10 +27,30 @@ def get_policy(policy_id, base_url, api_id, api_key, caid=None, extended = True)
     
     return response['value']
 
+def get_ip_setting_id(policy):
+    for setting in policy['policySettings']:
+        if "policySettingType" in setting and setting['policySettingType'] == 'IP':
+            return setting['id']
+        
 def get_policy_exception_setting_id(policy):
     for setting in policy['policySettings']:
         if "policyDataExceptions" in setting:
             return setting['id']
+        
+def create_ip_update_object(policy_id, policy_settings_id, ip_addresses):   
+    return {
+        "id": policy_id,
+        "policySettings": [
+              {
+                "id": policy_settings_id, 
+                "data": {
+                    "ips": [
+                        ip_addresses
+                    ]
+                }                       
+              }
+            ]
+        }
 
 def create_exception_update_object(policy_id, policy_settings_id, ip_addresses, comment, comment_max_len=120):   
     return {
@@ -52,6 +72,32 @@ def create_exception_update_object(policy_id, policy_settings_id, ip_addresses, 
               }
             ]
         }
+
+def add_ip(policy_id, ip_address, base_url, api_id, api_key, caid=None):
+# curl -X 'POST' \
+#   'https://api.imperva.com/policies/v2/policies/1544495?caid=1769792' \
+#   -H 'accept: application/json' \
+#   -H 'x-API-Id: 127033' \
+#   -H 'x-API-Key: 0a838017-d68a-4df4-934b-8a97d02e40de' \
+#   -H 'Content-Type: application/json' \
+#   -d '{
+#   "policySettings": [
+#     {
+#       "id": 6347860,
+#       "data": {
+#         "ips": [
+#           "64.223.136.47"
+#         ]
+#       }
+#     }
+#   ]
+# }'
+    policy = get_policy(policy_id, base_url, api_id, api_key, caid)
+    print("Modifying policy: ", policy['description'])
+    ip_setting_id = get_ip_setting_id(policy)
+    add_ip_body = create_ip_update_object(policy_id, ip_setting_id, ip_address)
+
+    return update_policy(base_url, policy_id, api_id, api_key, add_ip_body, caid)
 
 # Function to update policy with new IP exception
 def add_ip_exception(policy_id, ip_address, reason, base_url, api_id, api_key, caid=None, reason_max_len=120):
@@ -89,6 +135,10 @@ def add_ip_exception(policy_id, ip_address, reason, base_url, api_id, api_key, c
     exceptionSettingsId = get_policy_exception_setting_id(policy)
     exceptionBody = create_exception_update_object(policy_id, exceptionSettingsId, [ip_address], reason, reason_max_len)
     
+    return update_policy(base_url, policy_id, api_id, api_key, exceptionBody, caid)
+
+def update_policy(base_url, policy_id, api_id, api_key, update_body, caid=None):
+    
     url = f"{base_url}/v2/policies/{policy_id}?"
     if caid: url += f'caid={caid}'
 
@@ -99,30 +149,35 @@ def add_ip_exception(policy_id, ip_address, reason, base_url, api_id, api_key, c
         'Content-Type': 'application/json'
     }
     try:
-        response = requests.post(url, headers=headers, json=exceptionBody)
+        response = requests.post(url, headers=headers, json=update_body)
         if response.ok:
             return response.json() 
         else:
             response.raise_for_status()
         
     except Exception as e:
-        raise Exception('Failed API call to Imperva') from e
-        
+        raise Exception('Failed API call to Imperva') from e        
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Add IP exception to a policy.')
     parser.add_argument('-p','--policy_id', type=int, required=True, help='The ID of the policy')
     parser.add_argument('-ip','--ip_address', type=str, required=True, help='The IP address to add as an exception')
-    parser.add_argument('-c', '--comment', type=str, required=True, help='Reason for the exception')
+    parser.add_argument('-exception', action='store_true', help="Add exception for ip, and not block.")
+    parser.add_argument('-c', '--comment', type=str, help='Reason for the exception')
     parser.add_argument('--api_id', type=str, default=os.getenv('IMPERVA_API_ID'), help='API ID for authentication')
     parser.add_argument('--api_key', type=str, default=os.getenv('IMPERVA_API_KEY'), help='API key for authentication')
     parser.add_argument('--base_url', type=str, default=os.getenv('IMPERVA_BASE_URL', 'https://api.imperva.com/policies'), help='Base URL for the API')
     parser.add_argument('--comment_max_len', type=int, default=os.getenv('IMPERVA_COMMENT_MAX', 120), help='The max length of the comment passed to Imperva')
     parser.add_argument('--caid', type=str, help='Specify the account ID')
 
+    parser.add_argument('--debug', action='store_true', help='Allow debug output and expanded exception display.')
+
     args = parser.parse_args()
 
-    result = add_ip_exception(args.policy_id, args.ip_address, args.comment, args.base_url, args.api_id, args.api_key, args.caid, args.comment_max_len)
+    if args.exception:
+        result = add_ip_exception(args.policy_id, args.ip_address, args.comment, args.base_url, args.api_id, args.api_key, args.caid, args.comment_max_len)
+    else:
+        result = add_ip(args.policy_id, args.ip_address, args.base_url, args.api_id, args.api_key, args.caid)
     pprint.pprint(result)
 
