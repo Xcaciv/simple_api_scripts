@@ -5,24 +5,27 @@ import warnings
 from jira import JIRA, JIRAError
 import csv
 import logging
-import pprint
+from libs.argument_parser_extensions import *
 
 def download_issue_data(jql, fields=["summary","assignee","created"], file_name="jira_output.csv", page_size=100, expand_fields=None, jira_connection=None, jira_srver=None, jira_token=None, jira_user=None, localserver=False, overwrite_existing=True):
     """
-    Downloads issue data from Jira based on the provided JQL query and saves it in a CSV file.
-
+    Downloads issue data from Jira based on a JQL query and saves it to a CSV file.
     Args:
-        jql (str): Jira Query Language (JQL) to search for issues.
-        fields (list, optional): List of fields to include in the CSV. Defaults to ["key", "summary","assignee","created","resolutiondate"].
-        file_name (str, optional): Name of the CSV file to save the data. Defaults to "jira_output.csv".
-        page_size (int, optional): Page size for pagination. Defaults to 100.
-        status_callback (function, optional): Callback function to display status messages. Defaults to None.
-        jira_connection (JIRA, optional): Existing JIRA connection object. Defaults to None.
-        jira_srver (str, optional): Jira server URL. Defaults to None.
-        pat (str, optional): Jira personal access token. Defaults to None.
-        localserver (bool, optional): Flag to indicate if running on a local server. Defaults to False.
-    """  
-
+        jql (str): The JQL query to search for issues.
+        fields (list, optional): List of fields to retrieve for each issue. Defaults to ["summary", "assignee", "created"].
+        file_name (str, optional): The name of the output CSV file. Defaults to "jira_output.csv".
+        page_size (int, optional): The number of issues to retrieve per page. Defaults to 100.
+        expand_fields (list, optional): List of fields to expand in the search results. Defaults to None.
+        jira_connection (JIRA, optional): An existing Jira connection object. If None, a new connection will be created. Defaults to None.
+        jira_srver (str, optional): The Jira server URL. Required if jira_connection is None. Defaults to None.
+        jira_token (str, optional): The Jira API token. Required if jira_connection is None. Defaults to None.
+        jira_user (str, optional): The Jira username. Required if jira_connection is None. Defaults to None.
+        localserver (bool, optional): Whether to suppress warnings for local server connections. Defaults to False.
+        overwrite_existing (bool, optional): Whether to overwrite the existing CSV file if it exists. Defaults to True.
+    Returns:
+        None
+    """
+    
     if jira_connection is None:
         jira_connection = get_jira_connection(jira_srver, jira_user, jira_token, localserver)
     if localserver:
@@ -76,13 +79,14 @@ def download_issue_data(jql, fields=["summary","assignee","created"], file_name=
 
 def write_issues_to_csv(issues, fields, file_name, csv_header):
     """
-    Writes the Jira issues data to a CSV file.
-
+    Writes a list of JIRA issues to a CSV file.
     Args:
-        issues (list): List of Jira issues.
-        fields (list): List of fields to include in the CSV.
-        file_name (str): Name of the CSV file.
-        csv_header (bool): Flag to indicate if the CSV file should write a header row.
+        issues (list): A list of JIRA issue objects.
+        fields (list): A list of field names to include in the CSV.
+        file_name (str): The name of the CSV file to write to.
+        csv_header (bool): If True, write the CSV header.
+    Returns:
+        None
     """
 
     with open(file_name, mode='a', newline='') as csvfile:
@@ -99,6 +103,20 @@ def write_issues_to_csv(issues, fields, file_name, csv_header):
             writer.writerow(row)
 
 def get_jira_connection(jira_srver, jira_user, jira_token, localserver=False):
+    """
+    Establishes a connection to a Jira server.
+    Args:
+        jira_srver (str): The URL of the Jira server.
+        jira_user (str): The username for Jira authentication. If set to "nouser" or None, token-based authentication is used.
+        jira_token (str): The API token or password for Jira authentication.
+        localserver (bool, optional): If True, SSL verification is disabled. Defaults to False.
+    Returns:
+        JIRA: An instance of the JIRA client if the connection is successful.
+        None: If there is an error connecting to the Jira server.
+    Raises:
+        Exception: If there is an error connecting to the Jira server.
+    """
+    
     basicAuth = None
     if not (jira_user is None or jira_user == "nouser"):
         basicAuth = (jira_user, jira_token)
@@ -129,6 +147,23 @@ def get_jira_connection(jira_srver, jira_user, jira_token, localserver=False):
         return
 
 def jira_set_issue_status(jira_issue, jira_status, comment=None, jira_server=None, jira_user=None, jira_token=None, jira_connection=None, localserver=False, fields=None):
+    """
+    Transition a JIRA issue to a new status with optional comment and additional fields.
+    Args:
+        jira_issue (str): The ID or key of the JIRA issue to transition.
+        jira_status (str): The name or ID of the status to transition the issue to.
+        comment (str, optional): A comment to add to the issue during the transition. Defaults to None.
+        jira_server (str, optional): The URL of the JIRA server. Required if jira_connection is not provided. Defaults to None.
+        jira_user (str, optional): The JIRA username for authentication. Required if jira_connection is not provided. Defaults to None.
+        jira_token (str, optional): The JIRA API token for authentication. Required if jira_connection is not provided. Defaults to None.
+        jira_connection (JIRA, optional): An existing JIRA connection object. If provided, jira_server, jira_user, and jira_token are ignored. Defaults to None.
+        localserver (bool, optional): If True, suppresses warnings for local server usage. Defaults to False.
+        fields (dict, optional): Additional fields to set during the transition. Defaults to None.
+    Returns:
+        dict: The result of the transition operation, or None if the transition failed.
+    Raises:
+        Exception: If there is an error transitioning the issue, with details from the JIRAError or general Exception.
+    """
 
     try:
         if jira_connection is None:
@@ -159,6 +194,21 @@ def jira_set_issue_status(jira_issue, jira_status, comment=None, jira_server=Non
     return result
 
 def jira_add_issue_comment(jira_issue, comment="Transitioned via script", jira_server=None, jira_user=None, jira_token=None, jira_connection=None, localserver=False):
+    """
+    Adds a comment to a specified Jira issue.
+    Args:
+        jira_issue (str): The Jira issue key or ID to add the comment to.
+        comment (str, optional): The comment text to add. Defaults to "Transitioned via script".
+        jira_server (str, optional): The Jira server URL. Required if jira_connection not provided.
+        jira_user (str, optional): The Jira username. Required if jira_connection not provided.
+        jira_token (str, optional): The Jira API token. Required if jira_connection not provided.
+        jira_connection (JIRA, optional): An existing JIRA connection object. If not provided, a new connection will be created.
+        localserver (bool, optional): Flag indicating if connecting to a local server. Defaults to False.
+    Returns:
+        Comment: The created comment object.
+    Raises:
+        Exception: If there is an error adding the comment to the Jira issue.
+    """
 
     if jira_connection is None:
         jira_connection = get_jira_connection(jira_server, jira_user, jira_token, localserver)
@@ -177,6 +227,24 @@ def jira_add_issue_comment(jira_issue, comment="Transitioned via script", jira_s
         warnings.showwarning = restore_warning
 
 def jira_update_field(jira_server, jira_user, jira_token, jira_issue, field_to_set, field_value_name=None, field_value_id=None, jira_connection=None, localserver=False, fields=None):
+    """
+    Updates a field in a Jira issue with the specified value.
+    Args:
+        jira_server (str): URL of the Jira server
+        jira_user (str): Jira username or email
+        jira_token (str): Jira API token or password
+        jira_issue (str): Jira issue key/ID to update
+        field_to_set (str): Name of the field to update
+        field_value_name (str, optional): Display name of the field value to set. Defaults to None.
+        field_value_id (str, optional): ID of the field value to set. Defaults to None.
+        jira_connection (jira.JIRA, optional): Existing Jira connection object. Defaults to None.
+        localserver (bool, optional): Flag indicating if connecting to a local server. Defaults to False.
+        fields (dict, optional): Additional fields for the Jira connection. Defaults to None.
+    Returns:
+        dict: Result of the field update operation from Jira
+    Raises:
+        Exception: If there is an error updating the Jira field value
+    """
     if jira_connection is None:
         jira_connection = get_jira_connection(jira_server, jira_user, jira_token, localserver)
     if localserver:
@@ -197,6 +265,26 @@ def jira_update_field(jira_server, jira_user, jira_token, jira_issue, field_to_s
     return jira_result
 
 def update_field_value(jira_connection, jira_issue, field_to_set, field_value_name=None, field_value_id=None, ):
+    """
+    Updates a field value in a Jira issue using either an ID or name value.
+
+    Args:
+        jira_connection: Active JIRA connection object
+        jira_issue: The JIRA issue key or ID to update
+        field_to_set: Name of the field to be updated
+        field_value_name: Optional name value to set the field to
+        field_value_id: Optional ID value to set the field to
+
+    Returns:
+        The result of the issue.update() call
+
+    Raises:
+        JIRAError: If the update fails or connection issues occur
+
+    Notes:
+        Either field_value_name or field_value_id should be provided, not both
+        For custom fields, field_to_set should include the customfield_ prefix
+    """
     issue = jira_connection.issue(jira_issue) #, field=field_to_set
     if field_value_id:
         logging.debug('setting value by id')
@@ -206,6 +294,20 @@ def update_field_value(jira_connection, jira_issue, field_to_set, field_value_na
         return issue.update(fields={ field_to_set : {'value': field_value_name} })
 
 def list_issue_fields(jira_connection, jira_issue):
+    """
+    Lists all fields and their values for a given Jira issue.
+    Args:
+        jira_connection: An authenticated JIRA connection object
+        jira_issue: String representing the Jira issue key (e.g. 'PROJ-123')
+    Raises:
+        Exception: If there is a JIRAError or other error while fetching issue fields
+    Example:
+        >>> jira_conn = JIRA('https://jira.example.com', auth=('user', 'pass'))
+        >>> list_issue_fields(jira_conn, 'PROJ-123')
+        Field: summary Name: Summary Value: Issue title
+        Field: status Name: Status Value: Open
+        ...
+    """
     try:
 
         all_fields = {field['id']: field['name'] for field in jira_connection.fields()}
@@ -219,11 +321,46 @@ def list_issue_fields(jira_connection, jira_issue):
         raise Exception(f'Failed to list issue {jira_issue} fields') from e
 
 def list_issue_transitions(jira_connection, jira_issue):
+    """
+    Lists all available transitions for a given JIRA issue.
+
+    This function retrieves and prints all possible status transitions for a specified JIRA issue,
+    showing both the transition ID and name for each available transition.
+
+    Args:
+        jira_connection: A JIRA connection object used to interact with the JIRA API
+        jira_issue: The JIRA issue object or issue key to check transitions for
+
+    Returns:
+        None. Prints transition details to standard output.
+
+    Example:
+        >>> list_issue_transitions(jira, 'PROJECT-123')
+        Transition Id: 11  Name: To Do
+        Transition Id: 21  Name: In Progress
+        Transition Id: 31  Name: Done
+    """
     transitions = jira_connection.transitions(jira_issue)
     for transition in transitions:
         print(f'Transition Id: {transition['id']}  Name: {transition['name']}')
 
 def assign_user(jira_connection, jira_issue, jira_user):
+    """
+    Assigns a Jira issue to a specific user.
+
+    Args:
+        jira_connection: The JIRA connection object used to interact with JIRA API.
+        jira_issue: The JIRA issue key or object to be assigned.
+        jira_user: The username or account ID of the user to assign the issue to.
+
+    Returns:
+        The response from the JIRA API assignment operation.
+
+    Raises:
+        Exception: If the assignment fails, either due to JIRA API error or other issues.
+            The exception message includes details about the failure, including the issue key
+            and target user, and preserves the original error context.
+    """
     try:
         return jira_connection.assign_issue(jira_issue, jira_user)
     except JIRAError as jex:
@@ -232,6 +369,20 @@ def assign_user(jira_connection, jira_issue, jira_user):
         raise Exception(f'Failed to assign issue {jira_issue} to user {jira_user}') from e
 
 def jira_response_check(jira_response):
+    """
+    Check for errors in Jira API response and raise appropriate exceptions.
+
+    Args:
+        jira_response: Response object from Jira API call. Can be None or a dictionary containing
+                      potential error messages.
+
+    Raises:
+        Exception: If response contains error messages in 'errorMessages' or 'errors' fields
+        ValueError: If response cannot be parsed properly
+
+    Returns:
+        None if response is None or no errors are found
+    """
     try:
         if jira_response == None :
             return
@@ -251,28 +402,28 @@ def EnsureBase64Decode(s):
 
 def main():
     parser = argparse.ArgumentParser(description='JIRA Extensions')
-    parser.add_argument('-s','--jira_server', default=os.environ.get("JIRA_SERVER"), help='Jira server URL')
-    parser.add_argument('-u','--jira_user', default=os.environ.get("JIRA_USER"), help='Jira user')
-    parser.add_argument('-t', '--jira_token', default=os.environ.get("JIRA_TOKEN"), help='Jira personal access token (API Token)')
+    parser.add_argument('-s','--jira_server', type=str_url, default=os.environ.get("JIRA_SERVER"), help='Jira server URL')
+    parser.add_argument('-u','--jira_user', type=validate_email, default=os.environ.get("JIRA_USER"), help='Jira user')
+    parser.add_argument('-t', '--jira_token', type=str_alnum_eq, default=os.environ.get("JIRA_TOKEN"), help='Jira personal access token (API Token)')
 
-    parser.add_argument('-issue', type=str, help="Jira issue for operation")
-    parser.add_argument('-comment', type=str, help="String to add as comment to the issue")
+    parser.add_argument('-issue', type=str_alnum, help="Jira issue for operation")
+    parser.add_argument('-comment', type=str_string_without_markup, help="String to add as comment to the issue")
 
     parser.add_argument('-assign', type=str, help="the user to assign the issue to. None will set it to unassigned. -1 will set it to Automatic.")
 
     parser.add_argument('--list_all_custom_fields', action='store_true', help='Flag to list all custom fields.')
     parser.add_argument('--list_issue_fields', action='store_true', help='Flag to list custom fields for a given issue')
     parser.add_argument('--list_issue_transitions', action='store_true', help='Flag to list transitions for a given issue')
-    parser.add_argument('-transition', type=str, help="Jira issue transition to apply")
+    parser.add_argument('-transition', type=str_alnum, help="Jira issue transition to apply")
 
-    parser.add_argument('--field_to_set', type=str, help="Jira issue field to set")
-    parser.add_argument('--field_value', type=str, help="Jira issue field value to set")
-    parser.add_argument('--field_value_id', type=str, help="Jira issue field value id to set")
+    parser.add_argument('--field_to_set', type=str_alnum, help="Jira issue field to set")
+    parser.add_argument('--field_value', type=str_alnum, help="Jira issue field value to set")
+    parser.add_argument('--field_value_id', type=str_alnum, help="Jira issue field value id to set")
 
 
-    parser.add_argument('-q', '--jql', help='JQL Query Language (JQL) query. Can be Base64 encoded or encolsed in double quotes with single quotes in the query')
+    parser.add_argument('-q', '--jql', type=str_base64_decoded, help='JQL Query Language (JQL) query. Can be Base64 encoded or encolsed in double quotes with single quotes in the query')
 
-    parser.add_argument('-f', '--file_name', default="jira_output.csv", help='Name of the CSV file to save the data. Default is jira_output.csv')
+    parser.add_argument('-f', '--file_name', type=str_filename, default="jira_output.csv", help='Name of the CSV file to save the data. Default is jira_output.csv')
     
     parser.add_argument('--fields', nargs='+', default=["summary","description","status","assignee","reporter","created"], help='Fields to be returned from Jira. Default is ["key","summary","status","assignee","reporter","created","ip_address"]')
     parser.add_argument('--page_size', type=int, default=100, help='Page size for the Jira query. Default is 100')
@@ -327,9 +478,8 @@ def main():
             return
 
         if args.jql:
-            jql = EnsureBase64Decode(args.jql)
             download_issue_data(
-                jql,
+                args.jql,
                 args.fields, 
                 args.file_name,
                 args.page_size,
