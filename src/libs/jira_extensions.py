@@ -7,7 +7,7 @@ import csv
 import logging
 from libs.argument_parser_extensions import *
 
-def download_issue_data(jql, fields=["summary","assignee","created"], file_name="jira_output.csv", page_size=100, expand_fields=None, jira_connection=None, jira_srver=None, jira_token=None, jira_user=None, localserver=False, overwrite_existing=True):
+def download_issue_data(jql, fields=["summary","assignee","created"], file_name="jira_output.csv", page_size=100, expand_fields=None, jira_connection=None, jira_server=None, jira_token=None, jira_user=None, localserver=False, overwrite_existing=True):
     """
     Downloads issue data from Jira based on a JQL query and saves it to a CSV file.
     Args:
@@ -17,7 +17,7 @@ def download_issue_data(jql, fields=["summary","assignee","created"], file_name=
         page_size (int, optional): The number of issues to retrieve per page. Defaults to 100.
         expand_fields (list, optional): List of fields to expand in the search results. Defaults to None.
         jira_connection (JIRA, optional): An existing Jira connection object. If None, a new connection will be created. Defaults to None.
-        jira_srver (str, optional): The Jira server URL. Required if jira_connection is None. Defaults to None.
+        jira_server (str, optional): The Jira server URL. Required if jira_connection is None. Defaults to None.
         jira_token (str, optional): The Jira API token. Required if jira_connection is None. Defaults to None.
         jira_user (str, optional): The Jira username. Required if jira_connection is None. Defaults to None.
         localserver (bool, optional): Whether to suppress warnings for local server connections. Defaults to False.
@@ -27,7 +27,7 @@ def download_issue_data(jql, fields=["summary","assignee","created"], file_name=
     """
     
     if jira_connection is None:
-        jira_connection = get_jira_connection(jira_srver, jira_user, jira_token, localserver)
+        jira_connection = get_jira_connection(jira_server, jira_user, jira_token, localserver)
     if localserver:
         restore_warning = warnings.showwarning
         warnings.showwarning = lambda *args, **kwargs: None
@@ -89,8 +89,8 @@ def write_issues_to_csv(issues, fields, file_name, csv_header):
         None
     """
 
-    with open(file_name, mode='a', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=["Issue key", "Issue id"] + fields)
+    with open(file_name, mode='a', newline='') as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=["Issue key", "Issue id"] + fields)
         
         if csv_header:
             writer.writeheader()
@@ -102,7 +102,7 @@ def write_issues_to_csv(issues, fields, file_name, csv_header):
             row = {**issueInfo, **row}
             writer.writerow(row)
 
-def get_jira_connection(jira_srver, jira_user, jira_token, localserver=False):
+def get_jira_connection(jira_server, jira_user, jira_token, localserver=False):
     """
     Establishes a connection to a Jira server.
     Args:
@@ -121,14 +121,14 @@ def get_jira_connection(jira_srver, jira_user, jira_token, localserver=False):
     if not (jira_user is None or jira_user == "nouser"):
         basicAuth = (jira_user, jira_token)
         options = {
-            'server': jira_srver,
+            'server': jira_server,
             'headers': {
                 'Accept': 'application/json'
             },
         }
     else:
         options = {
-            'server': jira_srver,
+            'server': jira_server,
             'headers': {
                 'Authorization': f'Bearer {jira_token}',
                 'Accept': 'application/json'
@@ -138,7 +138,7 @@ def get_jira_connection(jira_srver, jira_user, jira_token, localserver=False):
     if localserver:
         options['verify'] = False
 
-    logging.info(f"Connecting to Jira server {jira_srver}")
+    logging.info(f"Connecting to Jira server {jira_server}")
 
     try:
         return JIRA(options, max_retries=0, basic_auth=basicAuth)
@@ -421,13 +421,13 @@ def main():
     parser.add_argument('--field_value_id', type=str_alnum, help="Jira issue field value id to set")
 
 
-    parser.add_argument('-q', '--jql', type=str_base64_decoded, help='JQL Query Language (JQL) query. Can be Base64 encoded or encolsed in double quotes with single quotes in the query')
+    parser.add_argument('-q', '--jql', type=str_base64_decoded, help='JQL Query Language (JQL) query. Can be Base64 encoded or enclosed in double quotes with single quotes in the query')
 
     parser.add_argument('-f', '--file_name', type=str_filename, default="jira_output.csv", help='Name of the CSV file to save the data. Default is jira_output.csv')
     
     parser.add_argument('--fields', nargs='+', default=["summary","description","status","assignee","reporter","created"], help='Fields to be returned from Jira. Default is ["key","summary","status","assignee","reporter","created","ip_address"]')
     parser.add_argument('--page_size', type=int, default=100, help='Page size for the Jira query. Default is 100')
-    parser.add_argument('--localserver', action='store_true', help='Flag to indicate a self-signed certificate is being used. Causes ignoreing of certificate.')
+    parser.add_argument('--localserver', action='store_true', help='Flag to indicate a self-signed certificate is being used. Causes ignoring of certificate.')
     parser.add_argument('--overwrite', action='store_true', help='Flag to indicate if the file should be overwritten if it exists.')
     parser.add_argument('--expand_fields', nargs='+', help='Fields to expand in the Jira query. Default is None')
 
@@ -492,7 +492,7 @@ def main():
 
         if args.assign and args.issue:
             jira_result = assign_user(jira_connection, args.issue, args.assign)
-            print(f'Assiged issue: {args.issue} to {args.assign} :', 'success' if jira_result else 'fail')
+            print(f'Assigned issue: {args.issue} to {args.assign} :', 'success' if jira_result else 'fail')
 
         if args.transition and args.issue:
             jira_result = jira_set_issue_status(args.issue, args.transition, args.comment, jira_connection=jira_connection)
