@@ -3,6 +3,7 @@ import os
 import base64
 import warnings
 from jira import JIRA, JIRAError
+from atlassian import ServiceDesk
 import csv
 import logging
 from libs.argument_parser_extensions import *
@@ -367,6 +368,68 @@ def assign_user(jira_connection, jira_issue, jira_user):
         raise Exception(f'Failed to assign issue {jira_issue} to user {jira_user}: {jex.text}') from jex
     except Exception as e:
         raise Exception(f'Failed to assign issue {jira_issue} to user {jira_user}') from e
+
+def submit_jsm_form(summary, assignment_team, audit_year, service_desk_id, request_type_id, jira_url, username, api_token):
+    """
+    Submits a Jira Service Management form with the specified fields using the Atlassian Python API.
+
+    Args:
+        summary (str): The summary of the request.
+        assignment_team (str): The team to assign the request to.
+        audit_year (int): The audit year.
+        service_desk_id (str): The ID of the service desk.
+        request_type_id (str): The ID of the request type.
+        jira_url (str): The Jira Service Management API base URL.
+        username (str): The username for authentication.
+        api_token (str): The API token for authentication.
+
+    Returns:
+        dict: The response from the Jira API.
+    """
+    service_desk = ServiceDesk(
+        url=jira_url,
+        username=username,
+        password=api_token
+    )
+
+    fields = {
+        "summary": summary,
+        "customfield_assignment_team": assignment_team,
+        "customfield_audit_year": audit_year
+    }
+
+    response = service_desk.create_customer_request(
+        service_desk_id=service_desk_id,
+        request_type_id=request_type_id,
+        request_fields=fields
+    )
+    return response
+
+def list_jsm_form_fields(service_desk_id, request_type_id, jira_url, username, api_token):
+    """
+    Lists the fields for a specific Jira Service Management form.
+
+    Args:
+        service_desk_id (str): The ID of the service desk.
+        request_type_id (str): The ID of the request type.
+        jira_url (str): The Jira Service Management API base URL.
+        username (str): The username for authentication.
+        api_token (str): The API token for authentication.
+
+    Returns:
+        dict: The fields for the specified request type.
+    """
+    service_desk = ServiceDesk(
+        url=jira_url,
+        username=username,
+        password=api_token
+    )
+
+    response = service_desk.get_request_type_fields(
+        service_desk_id=service_desk_id,
+        request_type_id=request_type_id
+    )
+    return response
 
 def jira_response_check(jira_response):
     """
