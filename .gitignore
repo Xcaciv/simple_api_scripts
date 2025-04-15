@@ -167,3 +167,4 @@ cython_debug/
 dataminr.bat
 *.csv
 *.zip
+/src/bak

@@ -2,6 +2,7 @@ import snyk
 
 def add_projects_to_collections(target, path_to_collection_map):
     # Initialize a Snyk client with your token
+    # retrieve the snyk token from the secret store
     client = snyk.SnykClient("<your_snyk_token>")
 
     # Get the organization

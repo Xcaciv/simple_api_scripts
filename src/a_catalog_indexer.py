@@ -6,12 +6,13 @@ import yaml
 import pandas as pd
 from github import Github
 
-def create_csv_index(access_token, file_name, repo_name, yaml_value, output_file, chunk_size=1000):
+def create_csv_index(access_token, file_name, repo_owner, repo_name, yaml_value, output_file, chunk_size=1000):
     # Initialize a Github instance with your access token
     g = Github(access_token)
 
     # Get the repository
-    repo = g.get_repo(repo_name)
+    repo = g.get_repo(f"{repo_owner}/{repo_name}")
+    print(f"Searching for file '{file_name}' in repository '{repo_owner}/{repo_name}'")
 
     # Initialize a list to store the results
     results = []
@@ -51,17 +52,19 @@ if __name__ == "__main__":
                         help='Github access token')
     parser.add_argument('--file_name', type=str, required=True,
                         help='Name of the file to search for')
+    parser.add_argument('--repo_owner', type=str, required=True,
+                        help='Owner of the repository to search in')
     parser.add_argument('--repo_name', type=str, required=True,
                         help='Name of the repository to search in')
     parser.add_argument('--yaml_value', type=str, required=True,
                         help='YAML value to extract')
-    parser.add_argument('--output_file', type=str, required=True,
+    parser.add_argument('--output_file', type=str,
                         help='Output CSV file name', default='output.csv')
 
     args = parser.parse_args()
 
-    if args.repo_name is None or args.accesstoken is None:
+    if args.repo_name is None or args.access_token is None:
         parser.print_help()
         sys.exit(1) 
 
-    create_csv_index(args.access_token, args.file_name, args.repo_name, args.yaml_value, args.output_file)
+    create_csv_index(args.access_token, args.file_name, args.repo_owner, args.repo_name, args.yaml_value, args.output_file)
